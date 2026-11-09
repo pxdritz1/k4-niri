@@ -820,8 +820,13 @@ K4Plugin {
                 return
             }
 
-            buscar.pid = resto
-            buscar.running = true
+            const ventana = Niri.windows.find(function (item) {
+                return String(item.pid) === resto
+            })
+            if (ventana)
+                Niri.focusWindow(ventana.id)
+            else
+                self.olvidar(resto)
         }
     }
 
@@ -1043,13 +1048,32 @@ K4Plugin {
         //  island; si no, la de la island se va a una ventana. Dos atajos
         //  para lo mismo no tenían sentido, y encima el de la ventana no
         //  llegaba mientras la island se quedaba el teclado.
-        function mudar(): void { quien.running = true }
+        function mudar(): void {
+            const enfocada = Niri.windows.find(window => window.is_focused)
+            if (enfocada && String(enfocada.app_id).toLowerCase() === "k4term"
+                    && Number(enfocada.pid) > 0) {
+                K4.Sistema.lanzar(["kill", "-USR1", String(enfocada.pid)])
+            } else if (self.sesion) {
+                self.sacar()
+            }
+        }
 
         //  Abrir donde estás mirando: se pregunta a Hyprland por la ventana
         //  con foco y se baja por el árbol de procesos hasta el último hijo
         //  —el intérprete que de verdad tiene el directorio— para leerle el
         //  cwd. Si algo falla, cae en abrir sin más.
-        function aqui(): void { donde.running = true }
+        function aqui(): void {
+            const enfocada = Niri.windows.find(window => window.is_focused)
+            const pid = Number(enfocada && enfocada.pid ? enfocada.pid : 0)
+            if (pid <= 0) {
+                K4.Sistema.lanzar(Consola.abrir(K4.Sistema.entorno("HOME")))
+                return
+            }
+            donde.command = ["sh", "-c",
+                "p=$1; while c=$(pgrep -P \"$p\" -n 2>/dev/null); [ -n \"$c\" ]; do p=$c; done; readlink /proc/$p/cwd 2>/dev/null",
+                "k4", String(pid)]
+            donde.running = true
+        }
 
         //  Empieza algo largo: a la píldora. Quien decide qué es «largo» es
         //  la terminal, que es la que tiene el reloj puesto.
@@ -1242,76 +1266,10 @@ K4Plugin {
     }
 
     K4.Process {
-        id: buscar
-        property string pid: ""
-        command: ["hyprctl", "clients", "-j"]
-        onSalida: function (texto) {
-            let ventanas = []
-            try {
-                ventanas = JSON.parse(texto)
-            } catch (e) {
-                return
-            }
-            const viva = ventanas.some(function (v) {
-                return String(v.pid) === buscar.pid
-            })
-            if (!viva) {
-                self.olvidar(buscar.pid)
-                return
-            }
-            enfoque.pid = buscar.pid
-            enfoque.running = true
-        }
-        onTerminado: running = false
-    }
-
-    //  Hyprland 0.56 ya no traga `dispatch focuswindow pid:N`: su parser Lua
-    //  se atraganta con los dos puntos del selector. La vía viva es `eval`,
-    //  la misma que usa el tema de Hyprland en esta casa.
-    K4.Process {
-        id: enfoque
-        property string pid: ""
-        command: ["hyprctl", "eval",
-                  "local v = hl.get_window(\"pid:" + pid + "\")"
-                  + " if v then hl.dispatch(hl.dsp.focus({ window = v })) end"]
-        onTerminado: running = false
-    }
-
-    //  Quién está delante ahora mismo. Con eso se decide hacia dónde muda la
-    //  sesión: la barra no puede preguntarle a una ventana de GPUI, pero sí
-    //  puede llamarla — y al proceso de una ventana se le llama con una señal.
-    K4.Process {
-        id: quien
-        command: ["hyprctl", "activewindow", "-j"]
-        onSalida: function (texto) {
-            let v = null
-            try {
-                v = JSON.parse(texto)
-            } catch (e) {
-                v = null
-            }
-            if (v && String(v.class) === "k4term" && v.pid > 0) {
-                K4.Sistema.lanzar(["kill", "-USR1", String(v.pid)])
-                return
-            }
-            //  Mudar es mover algo que existe. Sin sesión en la island no hay
-            //  nada que llevarse, y abrir una terminal nueva aquí sería una
-            //  sorpresa: pasó en la primera prueba y no se entiende.
-            if (self.sesion)
-                self.sacar()
-        }
-        onTerminado: running = false
-    }
-
-    K4.Process {
         id: donde
-        command: ["sh", "-c",
-            "p=$(hyprctl activewindow -j | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"pid\") or 0)' 2>/dev/null);" +
-            " [ \"$p\" -gt 0 ] 2>/dev/null || exit 0;" +
-            " while c=$(pgrep -P \"$p\" -n 2>/dev/null); [ -n \"$c\" ]; do p=$c; done;" +
-            " readlink /proc/$p/cwd 2>/dev/null"]
         onSalida: function (texto) {
-            K4.Sistema.lanzar(Consola.abrir(texto.trim()))
+            const ruta = String(texto || "").trim() || K4.Sistema.entorno("HOME")
+            K4.Sistema.lanzar(Consola.abrir(ruta))
         }
         onTerminado: running = false
     }
