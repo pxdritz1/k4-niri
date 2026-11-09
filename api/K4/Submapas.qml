@@ -1,10 +1,10 @@
 pragma Singleton
 
-//  En qué submapa está Hyprland ahora mismo.
+//  En qué submapa está el compositor ahora mismo.
 //
 //  Un submapa es el teclado hablando otro idioma un rato: las teclas de la
 //  captura, las de redimensionar ventanas, lo que hayas declarado tú. Un
-//  plugin no puede asomarse al socket de eventos de Hyprland por su cuenta
+//  plugin no puede asomarse al socket de eventos del compositor por su cuenta
 //  —lo de plataforma baja a un servicio, que es la regla de la casa que vigila
 //  tools/api.py—, así que escucha la barra y el estado se publica aquí: "" si
 //  no hay submapa, y su id crudo si lo hay.
