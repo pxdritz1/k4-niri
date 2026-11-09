@@ -461,9 +461,14 @@ Singleton {
         return i >= 0 ? catalogo[i] : null
     }
 
+    function esIncompatible(id) {
+        return !!Quickshell.env("NIRI_SOCKET")
+            && ["hyprtheme", "pantallas", "submap"].indexOf(id) !== -1
+    }
+
     function estaHabilitado(id) {
         const m = metadata(id)
-        if (!m)
+        if (!m || esIncompatible(id))
             return false
         return habilitados[id] !== undefined ? !!habilitados[id] : m.enabled !== false
     }
@@ -474,7 +479,7 @@ Singleton {
     }
 
     function poner(id, valor) {
-        if (indice(id) < 0 || !puedeConfigurar(id))
+        if (indice(id) < 0 || !puedeConfigurar(id) || esIncompatible(id))
             return
         const d = Object.assign({}, habilitados)
         d[id] = !!valor
