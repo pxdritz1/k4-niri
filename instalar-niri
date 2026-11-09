@@ -5,7 +5,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DESTINO=${K4_DESTINO:-$ROOT}
 NIRI_CONFIG=${NIRI_CONFIG:-$HOME/.config/niri/config.kdl}
 K4_BINDINGS=${K4_NIRI_BINDINGS:-$HOME/.config/niri/k4.kdl}
-MARKER='# k4-niri: managed include'
+MARKER='// k4-niri: managed include'
 
 usage() {
     cat <<'EOF'
