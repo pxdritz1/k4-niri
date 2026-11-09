@@ -27,14 +27,19 @@ Singleton {
             workspaces = data.workspaces || []
             updateFocusedOutput()
             break
-        case "WorkspaceActivated":
+        case "WorkspaceActivated": {
+            const activated = workspaces.find(item => item.id === data.id)
+            const output = activated ? activated.output : null
             workspaces = workspaces.map(item => Object.assign({}, item, {
-                is_active: item.id === data.id ? true : item.is_active,
-                is_focused: data.focused ? item.id === data.id
+                is_active: item.id === data.id ? true
+                    : (output && item.output === output ? false : item.is_active),
+                is_focused: data.focused
+                    ? item.id === data.id
                     : (item.id === data.id ? false : item.is_focused)
             }))
             updateFocusedOutput()
             break
+        }
         case "WindowsChanged":
             windows = data.windows || []
             break
@@ -64,7 +69,7 @@ Singleton {
 
     function updateFocusedOutput() {
         const focused = workspaces.find(item => item.is_focused)
-        if (focused && focused.output) focusedOutput = String(focused.output)
+        focusedOutput = focused && focused.output ? String(focused.output) : ""
     }
 
     function action(name, args) {
@@ -89,7 +94,7 @@ Singleton {
     function focusWorkspaceUp() { return action("focus-workspace-up") }
     function toggleOverview() { return action("toggle-overview") }
     function reloadConfig() { return action("load-config-file") }
-    function quit() { return action("quit") }
+    function quit() { return action("quit", ["--skip-confirmation"]) }
 
     function runNextAction() {
         if (actionRunning || pendingActions.length === 0) return
