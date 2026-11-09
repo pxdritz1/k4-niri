@@ -8,7 +8,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 
 Singleton {
@@ -138,11 +137,6 @@ Singleton {
     }
 
     // ── enfocar la ventana de la aplicación ───────────────────────
-    // Hyprland.toplevels llega vacío aquí, así que se pregunta por hyprctl y
-    // se busca a mano: clase exacta, luego clase que contenga, luego título.
-    property var pendingMatch: []
-    property string pendingPid: ""
-    property var pendingNotification: null
 
     //  ── de quién es una notificación ──────────────────────────────
     //
@@ -261,46 +255,8 @@ Singleton {
         const clases = clasesDe(n)
         if (clases.length === 0)
             return
-
-        pendingMatch = clases
-        pendingPid = destinoDe(n)
-        pendingNotification = n
-        clientQuery.running = true
-    }
-
-    //  ¿Es esta ventana de esta notificación? Solo por igualdad, que es lo que
-    //  las candidatas ya resuelven bien. El «contiene» se queda para el último
-    //  recurso de `matchAndFocus`, donde hay un clic detrás que ha pedido ir a
-    //  alguna parte y equivocarse de ventana no cuesta nada.
-    function casa(clases, cls, initial) {
-        for (let i = 0; i < clases.length; ++i)
-            if (clases[i] === cls || clases[i] === initial)
-                return true
-        return false
-    }
-
-    function matchAndFocus(json) {
-        const clases = pendingMatch
-        const n = pendingNotification
-        const pid = pendingPid
-        pendingMatch = []
-        pendingPid = ""
-        pendingNotification = null
-
-        if (!clases || clases.length === 0)
-            return
-
-        let list
-        try {
-            list = JSON.parse(json)
-        } catch (e) {
-            return
-        }
-
-        //  Para el segundo intento: la parte final de un id con puntos
-        //  —«org.gnome.Nautilus» → «nautilus»—, que a veces es la clase de
-        //  verdad. Las de tres letras o menos no valen: «contiene» con una
-        //  cadena así empareja media sesión.
+        const ventanas = Niri.windows
+        const pid = destinoDe(n)
         const colas = []
         for (let i = 0; i < clases.length; ++i) {
             const k = clases[i]
@@ -312,48 +268,29 @@ Singleton {
         let exact = null
         let partial = null
         let porPid = null
-        for (let i = 0; i < list.length; ++i) {
-            const c = list[i]
-            const cls = String(c.class || "").toLowerCase()
-            const initial = String(c.initialClass || "").toLowerCase()
-            const title = String(c.title || "").toLowerCase()
-            const initialTitle = String(c.initialTitle || "").toLowerCase()
-
-            //  Si se sabe de qué ventana era, no hay nada que adivinar.
-            if (pid.length > 0 && String(c.pid) === pid) {
-                porPid = c
+        for (let i = 0; i < ventanas.length; ++i) {
+            const window = ventanas[i]
+            const app = String(window.app_id || "").toLowerCase()
+            const title = String(window.title || "").toLowerCase()
+            if (pid && String(window.pid) === pid) {
+                porPid = window
                 break
             }
-
-            if (casa(clases, cls, initial)) {
-                exact = c
+            if (clases.indexOf(app) !== -1) {
+                exact = window
                 break
             }
-            if (partial === null)
-                for (let j = 0; j < colas.length; ++j)
-                    if (cls.indexOf(colas[j]) !== -1 || initial.indexOf(colas[j]) !== -1
-                        || initialTitle.indexOf(colas[j]) !== -1
-                        || title.indexOf(colas[j]) !== -1) {
-                        partial = c
-                        break
-                    }
+            if (!partial && colas.some(t => app.indexOf(t) !== -1 || title.indexOf(t) !== -1))
+                partial = window
         }
 
         const found = porPid || exact || partial
         if (found) {
-            // Sintaxis Lua, como el resto de la configuración de Hyprland: con
-            // el parser nuevo, `dispatch focuswindow address:…` no compila —se
-            // envuelve en hl.dispatch(...) y revienta— y hay que pasar un
-            // dispatcher de verdad. Las claves que admite `focus` son
-            // direction, monitor, window, urgent_or_last y last.
-            Hyprland.dispatch('hl.dsp.focus({ window = "address:' + found.address + '" })')
+            Niri.focusWindow(found.id)
             if (n && !n.resident)
                 n.dismiss()
             return
         }
-
-        // No está abierta: si la notificación dice de qué aplicación viene, se
-        // abre. Y si tampoco eso, se deja la notificación en su sitio.
         if (n && launchEntry(n))
             n.dismiss()
     }
@@ -454,28 +391,13 @@ Singleton {
     }
 
     Connections {
-        target: Hyprland
-
-        function onActiveToplevelChanged() {
-            if (Settings.notificacionesAlEnfocar)
-                notifs.descartarDeVentana(Hyprland.activeToplevel)
-        }
-    }
-
-    Process {
-        //  La voz de error, que antes se tiraba: si esto
-        //  falla, el motivo queda en el log de la barra.
-        stderr: SplitParser {
-            onRead: function (l) {
-                if (String(l).trim().length > 0)
-                    console.warn("notifs:", l)
-            }
-        }
-        id: clientQuery
-        command: ["hyprctl", "-j", "clients"]
-
-        stdout: StdioCollector {
-            onStreamFinished: notifs.matchAndFocus(this.text)
+        target: Niri
+        function onWindowsChanged() {
+            if (!Settings.notificacionesAlEnfocar)
+                return
+            const focused = Niri.windows.find(window => window.is_focused)
+            if (focused)
+                notifs.descartarDeVentana(focused)
         }
     }
 
