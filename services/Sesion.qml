@@ -52,7 +52,7 @@ Singleton {
         dormir.start()
     }
 
-    function cerrarSesion() { Niri.action("quit") }
+    function cerrarSesion() { Niri.quit() }
 
     function correr(cmd) {
         accion.command = cmd
