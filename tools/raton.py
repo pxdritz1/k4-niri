@@ -49,21 +49,8 @@ BOTONES = {"clic": BTN_LEFT, "izquierdo": BTN_LEFT,
 
 
 def donde():
-    """Dónde está el cursor según Hyprland, o None."""
-    firma = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
-    runtime = os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
-    ruta = "%s/hypr/%s/.socket.sock" % (runtime, firma)
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(0.3)
-        s.connect(ruta)
-        s.sendall(b"cursorpos")
-        d = s.recv(256).decode()
-        s.close()
-        x, y = d.split(",")
-        return int(x.strip()), int(y.strip())
-    except (OSError, ValueError):
-        return None
+    """Niri IPC does not expose the pointer coordinates."""
+    return None
 
 
 class Raton:
@@ -106,7 +93,7 @@ class Raton:
             time.sleep(0.002)
 
     def ir_a(self, x, y):
-        """A una posición de pantalla, corrigiendo con lo que diga Hyprland."""
+        """A una posición aproximada; sin coordenadas del cursor no se puede corregir."""
         #  Si se sabe dónde está, se va en relativo desde ahí. Irse antes a la
         #  esquina parece más seguro y es peor: saca el puntero de lo que
         #  estuviera señalando, y cualquier cosa que reaccione al ratón —la
