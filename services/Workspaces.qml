@@ -1,5 +1,4 @@
 pragma Singleton
-
 import QtQuick
 import Quickshell
 
@@ -13,20 +12,11 @@ Singleton {
         })
         return values
     }
-
     readonly property int activo: {
         for (let i = 0; i < list.length; ++i)
-            if (list[i].is_focused)
-                return list[i].id
+            if (list[i].is_focused) return list[i].id
         return -1
     }
-
-    readonly property int dotsWidth: list.length === 0
-        ? 0 : (list.length - 1) * 10 + 18 + 8
-
-    readonly property var llenos: Niri.fullscreenByOutput
-
-    function lleno(pantalla) {
-        return llenos[String(pantalla)] === true
-    }
+    readonly property int dotsWidth: list.length === 0 ? 0 : (list.length - 1) * 10 + 26
+    function lleno(pantalla) { return false }
 }
