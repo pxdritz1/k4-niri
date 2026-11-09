@@ -51,7 +51,7 @@ QtObject {
     readonly property var rect: (_i && _i.rect) ? _i.rect
         : ({ x: 0, y: 0, ancho: 0, alto: 0 })
 
-    //  En qué pantalla está desplegada AHORA, por nombre (los de `hyprctl
+    //  En qué pantalla está desplegada AHORA, por nombre (los de `Quickshell.screens
     //  monitors`). La píldora existe en todas; una vista abierta vive en una
     //  sola, y esta es esa.
     //
