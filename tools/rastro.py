@@ -4,12 +4,12 @@
     rastro.py --salida /tmp/k4-captura/rastro-X.jsonl [--hz 30] [--region "X,Y WxH"]
 
 Escribe JSONL: una línea de cabecera y luego una por muestra. Los clics NO se
-sondean —Hyprland no los publica—: llegan por la entrada estándar, una línea
+sondean —Niri no los publica por IPC—: llegan por la entrada estándar, una línea
 «clic <boton>» por cada uno, que es quien los recibe con un atajo global.
 
-La posición se pide por el socket de Hyprland y no con `hyprctl cursorpos`:
-medido, la consulta cuesta 0,019 ms, mientras que lanzar un proceso treinta
-veces por segundo se nota. A 30 Hz esto es un 0,06 % de un hilo.
+Niri no expone coordenadas globales del cursor por IPC. En esta plataforma,
+el rastro conserva los marcadores de clic recibidos por stdin, pero no genera
+muestras de posición.
 """
 import argparse, json, os, select, signal, sys, time
 
