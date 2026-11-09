@@ -25,7 +25,7 @@ Singleton {
     // La píldora existe en todas las pantallas; una vista desplegada, en una.
     // `pantallaPedida` conserva el origen de la acción hasta que el host sabe
     // qué plugin ganó. Un clic la rellena con su pantalla; un atajo cae en el
-    // monitor enfocado de Hyprland.
+    // monitor enfocado que informa Niri.
     property string pantallaActiva: ""
     property string pantallaPedida: ""
 
