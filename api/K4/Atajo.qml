@@ -1,12 +1,8 @@
-//  Un atajo global, de los que funcionan tenga el foco quien lo tenga.
-//
-//  Reexporta GlobalShortcut. El compositor es quien los reparte: aquí solo se
-//  declara el nombre, y en la configuración del compositor se ata a una tecla.
-//  Por eso lleva `appid` y `name`: juntos forman el identificador que allí se
-//  escribe como `k4:loquesea`.
-
-import Quickshell.Hyprland
-
-GlobalShortcut {
-    appid: "k4"
+// Niri does not expose an application-side GlobalShortcut protocol.
+// Declare the key in ~/.config/niri/config.kdl and call a K4 IPC target.
+import QtQuick
+Item {
+    property string name: ""
+    readonly property bool disponible: false
+    signal activated()
 }

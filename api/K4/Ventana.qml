@@ -25,10 +25,10 @@ import Quickshell.Wayland
 PanelWindow {
     id: ventana
 
-    // Sale en `hyprctl layers` y sirve para darle reglas en el compositor.
+    // Sale en `niri msg layers` y sirve para darle reglas en el compositor.
     property string nombre: "k4"
 
-    //  En qué monitor sale, por nombre (los de `hyprctl monitors`). Vacío es
+    //  En qué monitor sale, por nombre (los de `Quickshell.screens`). Vacío es
     //  el que el compositor prefiera. Casa con `K4.Isla.rectEn(pantalla)`
     //  para anclar lo que asoma a la island de ESA pantalla.
     property string pantalla: ""
@@ -49,7 +49,7 @@ PanelWindow {
     //
     //  Y ojo con esto en varios monitores: un agarre exclusivo NO es por
     //  pantalla. El foco de teclado en Wayland es uno para toda la sesión, y
-    //  Hyprland trata una capa exclusiva como un agarre modal — deja de
+    //  Niri trata una capa exclusiva como un agarre modal — deja de
     //  repartir eventos al resto, teclado Y puntero. Comprobado: con una
     //  ventana así abierta en el segundo monitor, la island del primero ya no
     //  se abre al pasarle el ratón, y lo que escribas se lo lleva ella aunque
@@ -98,7 +98,7 @@ PanelWindow {
     //     pantalla —swaybg, swww— y dentro de una misma capa manda el orden de
     //     creación: al cambiar de fondo se relanza swaybg, su superficie nueva
     //     queda por ENCIMA y lo que pintes deja de verse sin que nada avise.
-    //     Medido: `hyprctl layers` daba `0. k4-fondo` y `1. wallpaper`, y el
+    //     Medido: `niri msg layers` daba `0. k4-fondo` y `1. wallpaper`, y el
     //     lienzo estaba dibujando perfectamente debajo de su propio suelo.
     //     `Bottom` sigue estando debajo de todas las ventanas y por encima de
     //     ellos, que es lo que hace falta para dibujar un fondo de verdad.

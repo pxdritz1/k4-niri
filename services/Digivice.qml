@@ -22,7 +22,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 import K4 as K4
 import "DigiviceReglas.js" as Reglas
 
@@ -2135,6 +2134,7 @@ Singleton {
     //  una aplicación, que es el tranco más largo. No se mira cuál: solo
     //  cuántas hay, igual que solo se mira QUE hubo un cambio de ventana.
     property int _cuantasVentanas: 0
+    property int _idVentanaEnfocada: -1
 
     function _pasoPorActividad() {
         if (!indiceListo)
@@ -2148,7 +2148,7 @@ Singleton {
         //  único observable sin leer nada: si el NÚMERO de ventanas ha subido,
         //  se ha abierto una aplicación. Ni títulos, ni pids, ni nombres.
         let gesto = "ventana"
-        const n = Hyprland.toplevels ? Hyprland.toplevels.values.length : 0
+        const n = Niri.windows.length
         if (n > _cuantasVentanas && _cuantasVentanas > 0)
             gesto = "app"
         _cuantasVentanas = n
@@ -2168,22 +2168,20 @@ Singleton {
         darPaso("escritorio")
     }
 
-    //  Directo a Hyprland y no a través de `Ventanas`/`Workspaces`: es la
-    //  señal que el resto de la barra ya usa para esto —`Notifs` y el propio
-    //  `Ventanas` cuelgan de ella— y quitando el intermediario se quita la
-    //  duda de si el singleton de en medio estaba instanciado.
-    //
-    //  `activeToplevel` cambia tanto al saltar de ventana como al saltar de
-    //  escritorio (porque cambia la ventana con foco), así que con una basta.
-    //  Hijo suelto y NO `property var`: es el idioma que usan `Notifs` y
-    //  `Ventanas` para esta misma señal, y es el que funciona. Colgado de una
-    //  property no llegaba ni una.
+    //  El estado del compositor se observa desde el puente Niri compartido.
+    //  Un cambio de ventana cuenta como actividad; cambiar de workspace tiene
+    //  su propio paso aunque la ventana enfocada siga siendo la misma.
     Connections {
-        target: Hyprland
-        function onActiveToplevelChanged() { dv._pasoPorActividad() }
-        //  El escritorio aparte, con su zancada. `focusedWorkspace` cambia al
-        //  saltar de escritorio aunque la ventana con foco sea la misma.
-        function onFocusedWorkspaceChanged() { dv._pasoPorEscritorio() }
+        target: Niri
+        function onWindowsChanged() {
+            const focused = Niri.windows.find(window => window.is_focused)
+            const id = focused ? Number(focused.id) : -1
+            if (id === dv._idVentanaEnfocada)
+                return
+            dv._idVentanaEnfocada = id
+            dv._pasoPorActividad()
+        }
+        function onWorkspacesChanged() { dv._pasoPorEscritorio() }
     }
 
     //  Un latido lento solo para que «concentrado» cambie sin depender de que

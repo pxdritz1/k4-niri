@@ -1,12 +1,10 @@
 pragma Singleton
 
-//  Los atajos de teclado que tienes configurados en Hyprland.
+//  Los atajos de teclado que tienes configurados en Niri.
 //
-//  La fuente es el fichero de configuración, no `hyprctl binds`, y no por
-//  comodidad: con configuración en Lua, hyprctl informa de todos con
-//  `dispatcher: __lua`, o sea la tecla sí pero no qué hace, y encima su salida
-//  JSON viene desparejada en esta versión. El fichero dice exactamente qué
-//  hace cada uno y ya viene agrupado por los comentarios de sección.
+//  La fuente es la configuración KDL activa y sus fragmentos de `config.d`.
+//  El lector conserva la combinación, la orden y los comentarios de sección
+//  sin depender de una API privada del compositor.
 //
 //  Quien lo lee es tools/atajos.py. Aquí solo se pide, se guarda y se filtra.
 

@@ -1,388 +1,175 @@
 #!/usr/bin/env python3
-"""Lee los atajos de teclado configurados en Hyprland.
+"""Read active keyboard bindings from the Niri KDL configuration."""
 
-La fuente es el propio fichero de configuración y no `hyprctl binds`, y no por
-comodidad: con configuración en Lua, hyprctl informa de todos los atajos con
-`dispatcher: __lua` y `arg: 6`, o sea, la tecla sí pero no qué hace; y encima
-su salida en JSON viene malformada en esta versión —las claves y los valores
-salen desparejados—. El fichero, en cambio, dice exactamente qué hace cada uno
-y viene ya agrupado por secciones con los comentarios que escribiste.
-
-    atajos.py
-
-Saca JSON con la lista, cada atajo con su combinación, lo que hace y a qué
-sección pertenece.
-"""
-
+import glob
 import json
 import os
 import re
-import sys
+import shlex
 
-CONFIG = os.path.expanduser("~/.config/hypr/config")
-BINDS = os.path.join(CONFIG, "binds.lua")
+CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+NIRI_CONFIG = os.environ.get("NIRI_CONFIG", os.path.join(CONFIG_HOME, "niri", "config.kdl"))
+INCLUDE_RE = re.compile(r'^\s*include\s+"((?:\\.|[^"\\])*)"', re.MULTILINE)
+BIND_START_RE = re.compile(r"^\s*([A-Za-z0-9_+.-]+)(?:\s+[^{}\n]+)?\s*\{", re.MULTILINE)
+SECTION_RE = re.compile(r"^\s*//\s*-{2,}\s*(.+?)\s*-{2,}\s*$")
 
 
-def ficheros():
-    """Los .lua que atan teclas, `binds.lua` primero.
+def matching_brace(text, opening):
+    depth = 0
+    quoted = False
+    escaped = False
+    line_comment = False
+    block_comment = False
+    i = opening
+    while i < len(text):
+        char = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        if line_comment:
+            if char == "\n":
+                line_comment = False
+        elif block_comment:
+            if char == "*" and nxt == "/":
+                block_comment = False
+                i += 1
+        elif quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == "/" and nxt == "/":
+            line_comment = True
+            i += 1
+        elif char == "/" and nxt == "*":
+            block_comment = True
+            i += 1
+        elif char == '"':
+            quoted = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return -1
 
-    No basta con leer `binds.lua`: desde que el instalador de k4 saca sus atajos
-    a `k4.lua` —para no escribir dentro del fichero del usuario— viven en otro
-    sitio, y este panel se los dejaba fuera. Así que se lee cualquier .lua de la
-    carpeta que contenga `hl.bind`, y el orden es estable para que la lista no
-    baile entre arranques.
-    """
-    rutas = []
+
+def included_files(path, seen=None):
+    if seen is None:
+        seen = set()
+    path = os.path.realpath(path)
+    if path in seen or not os.path.isfile(path):
+        return
+    seen.add(path)
+    yield path
     try:
-        nombres = sorted(os.listdir(CONFIG))
+        source = open(path, encoding="utf-8").read()
     except OSError:
-        return rutas
-    for nombre in nombres:
-        if not nombre.endswith(".lua"):
-            continue
-        ruta = os.path.join(CONFIG, nombre)
+        return
+    for match in INCLUDE_RE.finditer(source):
+        raw = match.group(1)
         try:
-            if "hl.bind" not in open(ruta).read():
-                continue
-        except OSError:
-            continue
-        rutas.append(ruta)
-    # `binds.lua` delante: es el que trae las secciones que el usuario reconoce.
-    rutas.sort(key=lambda r: (os.path.basename(r) != "binds.lua", r))
-    return rutas
-
-# Anclados al final a propósito: sin el `$`, `local k4 = "a" .. raiz .. "b"` se
-# quedaba solo con el primer trozo y la orden salía descabalada.
-RE_LOCAL = re.compile(r'^\s*local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*)"\s*(?:--.*)?$')
-RE_GLOBAL = re.compile(r'^\s*([A-Z_][A-Z0-9_]*)\s*=\s*"([^"]*)"\s*(?:--.*)?$')
-RE_NUM = re.compile(r'^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(\d+)')
-RE_BIND = re.compile(r'hl\.bind\s*\(\s*(.+)$')
-RE_FOR = re.compile(r'^\s*for\s+(\w+)\s*=\s*(\w+)\s*,\s*(\w+)\s*do')
-# Dentro del bucle se suele hacer `local key = i % 10` y luego atar con `key`:
-# sin seguir ese alias, la combinación salía literalmente como «+ key».
-RE_ALIAS = re.compile(r'^\s*local\s+(\w+)\s*=\s*.*\b%s\b')
-# `local k4 = "quickshell ipc -p " .. raiz .. "/shell.qml call k4 "`
-RE_LOCAL_EXPR = re.compile(r'^\s*local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$')
-
-#  Lo que hace cada despachador, en cristiano. Los que no estén salen con su
-#  nombre limpio, que sigue diciendo bastante.
-#
-#  Esto es español, y sale en la BARRA, que habla el idioma que le digan. Así
-#  que no viaja como texto ya montado: se manda la frase por un lado y su
-#  detalle por otro (ver `describir`), y quien la pinta la pasa por
-#  `Idioma.t()`. Antes se concatenaba aquí, y el panel de atajos era una
-#  columna en español dentro de una barra en inglés.
-#
-#  Y por eso cada frase de este fichero tiene que estar TAMBIÉN en
-#  traducciones/: son cadenas de interfaz aunque nazcan en un guion.
-#  ── una cadena que acaba en la BARRA ─────────────────────────────────
-#
-#  No hace nada: devuelve lo que le den. Está para MARCAR, porque estas
-#  cadenas son de interfaz aunque nazcan en un guion de línea de órdenes —las
-#  pinta la barra, en el idioma que le hayan puesto— y `tools/textos.py` las
-#  recoge buscando exactamente esta llamada.
-#
-#  Sin la marca no cuentan para la cobertura, y una cadena que no cuenta es
-#  una cadena que un día sale sin traducir y nadie se entera.
-def T(s):
-    return s
+            include = bytes(raw, "utf-8").decode("unicode_escape")
+        except UnicodeDecodeError:
+            include = raw
+        if not os.path.isabs(include):
+            include = os.path.join(os.path.dirname(path), include)
+        for candidate in sorted(glob.glob(include)):
+            yield from included_files(candidate, seen)
 
 
-VERBOS = {
-    "window.close": T("Cerrar la ventana"),
-    "window.fullscreen": T("Pantalla completa"),
-    "window.float": T("Flotar o anclar la ventana"),
-    "window.move": T("Mover la ventana"),
-    "window.resize": T("Redimensionar"),
-    "window.cycle_next": T("Siguiente ventana"),
-    "window.pin": T("Fijar la ventana"),
-    "window.pseudo": T("Modo pseudo"),
-    "focus": T("Cambiar el foco"),
-    "workspace": T("Ir al espacio de trabajo"),
-    "layout": T("Cambiar la disposición"),
-    "exit": T("Salir de Hyprland"),
-    "kill": T("Matar una ventana"),
-    "global": T("Atajo global"),
-    "exec_cmd": "",              # se resuelve con el propio comando
-}
-
-
-def variables():
-    """Todo lo que haga falta para reconstruir las cadenas."""
-    vals = {}
-    rutas = [os.path.join(CONFIG, "variables.lua")] + ficheros()
-    for ruta in rutas:
-        try:
-            texto = open(ruta).read()
-        except OSError:
-            continue
-        for linea in texto.split("\n"):
-            for rx in (RE_LOCAL, RE_GLOBAL):
-                m = rx.match(linea)
-                if m:
-                    vals[m.group(1)] = m.group(2)
-                    break
-            else:
-                m = RE_NUM.match(linea)
-                if m:
-                    vals[m.group(1)] = m.group(2)
-                    continue
-                # Y las que se arman concatenando, que es como k4.lua construye
-                # sus tres llamadas de IPC a partir de la raíz. Sin esto la
-                # línea salía como «k4toggleLauncher» en vez de «k4 · lanzador».
-                m = RE_LOCAL_EXPR.match(linea)
-                if m:
-                    valor = literal(m.group(2), vals)
-                    if valor is not None:
-                        vals[m.group(1)] = valor
-    return vals
-
-
-def literal(expr, vals):
-    """La expresión Lua como cadena, o None si algo no se puede resolver aún."""
-    trozos = []
-    for parte in expr.split(".."):
-        parte = parte.strip()
-        if not parte:
-            return None
-        if parte.startswith('"') and parte.endswith('"') and len(parte) >= 2:
-            trozos.append(parte[1:-1])
-        elif parte in vals:
-            trozos.append(vals[parte])
-        else:
-            return None
-    return "".join(trozos) if trozos else None
-
-
-def resolver(expr, vals, indice=None):
-    """Junta una expresión Lua de concatenaciones en una cadena."""
-    trozos = []
-    for parte in expr.split(".."):
-        parte = parte.strip()
-        if not parte:
-            continue
-        if parte.startswith('"') and parte.endswith('"'):
-            trozos.append(parte[1:-1])
-        elif parte in vals:
-            trozos.append(vals[parte])
-        elif indice is not None and parte in indice:
-            trozos.append("№")          # marca del bucle, se sustituye luego
-        else:
-            trozos.append(parte)
-    return "".join(trozos)
-
-
-def partir(texto):
-    """Separa los dos argumentos de hl.bind respetando paréntesis y comillas."""
-    hondo = 0
-    comillas = False
-    for i, c in enumerate(texto):
-        if c == '"' and (i == 0 or texto[i - 1] != "\\"):
-            comillas = not comillas
-        elif not comillas:
-            if c in "({[":
-                hondo += 1
-            elif c in ")}]":
-                hondo -= 1
-            elif c == "," and hondo == 0:
-                return texto[:i], texto[i + 1:]
-    return texto, ""
-
-
-def hasta_cierre(texto):
-    """Lo que hay dentro del paréntesis, hasta el que lo cierra.
-
-    Recortar con `rstrip(")")` no vale cuando detrás viene otro argumento: en
-    `hl.dsp.exec_cmd(k4 .. "togglePlay"), { locked = true })` se colaba el
-    `{ locked = true }` dentro de la orden.
-    """
-    hondo = 0
-    comillas = False
-    for i, c in enumerate(texto):
-        if c == '"' and (i == 0 or texto[i - 1] != "\\"):
-            comillas = not comillas
-        elif not comillas:
-            if c in "({[":
-                hondo += 1
-            elif c in ")}]":
-                if hondo == 0:
-                    return texto[:i]
-                hondo -= 1
-    return texto
-
-
-def describir(accion, vals):
-    """Qué hace un atajo, en tres piezas.
-
-    Devuelve `(frase, detalle, detalleFrase)`:
-
-      · `frase` es TRADUCIBLE y puede llevar un `%1` donde va lo demás. Vacía
-        significa «esto no es prosa, píntalo tal cual» — el nombre de un
-        despachador que no conocemos, una orden.
-      · `detalle` es el trozo CRUDO que rellena el `%1`: `left`, `togglesplit`,
-        un número. Son identificadores y no se traducen ni se deben traducir.
-      · `detalleFrase` es un `%1` que sí es prosa —«el número»— y por tanto va
-        a traducir también.
-
-    Solo uno de los dos últimos viene con algo. Montarlo es cosa de quien
-    pinta, que es el único que sabe en qué idioma habla la barra.
-    """
-    accion = accion.strip().rstrip(")").strip()
-
-    m = re.match(r'hl\.dsp\.([A-Za-z_.]+)\s*\((.*)$', accion, re.S)
-    if not m:
-        return "", accion[:80], ""
-
-    nombre, dentro = m.group(1), hasta_cierre(m.group(2))
-
-    if nombre == "exec_cmd":
-        orden = resolver(dentro, vals).strip()
-        # los tres prefijos largos que aparecen una y otra vez
-        if "quickshell ipc" in orden:
-            # `call k4 abrir`, pero también `call k4.editor abrir`: cada módulo
-            # publica su propio objetivo y cortar por «call k4 » a secas dejaba
-            # esos con la orden entera, ruta incluida.
-            m3 = re.search(r'call\s+k4(?:\.(\w+))?\s+(.*)$', orden)
-            if m3:
-                modulo = (m3.group(1) + " ") if m3.group(1) else ""
-                return "", "k4 · " + modulo + m3.group(2).strip(), ""
-            return "", "k4 · " + orden.split("call k4 ")[-1].strip(), ""
-        if orden.startswith("noctalia msg "):
-            return "", "noctalia · " + orden[len("noctalia msg "):].strip(), ""
-        #  «Abrir» sí es prosa, así que va de frase con su hueco.
-        if orden.startswith("uwsm app -- "):
-            return T("Abrir %1"), orden[len("uwsm app -- "):].strip(), ""
-        return "", orden[:70], ""
-
-    conocido = nombre in VERBOS
-    base = VERBOS.get(nombre, nombre.replace(".", " · ").replace("_", " "))
-    detalle = ""
-    for clave in ("direction", "mode", "action", "workspace", "monitor", "window"):
-        m2 = re.search(clave + r'\s*=\s*"?([^",}]+)"?', dentro)
-        if m2:
-            detalle = m2.group(1).strip()
+def binding_blocks(source):
+    binds_match = re.search(r"(?m)^\s*binds\s*\{", source)
+    if not binds_match:
+        return
+    opening = source.find("{", binds_match.start())
+    closing = matching_brace(source, opening)
+    if closing < 0:
+        return
+    body = source[opening + 1:closing]
+    offset = opening + 1
+    cursor = 0
+    while True:
+        match = BIND_START_RE.search(body, cursor)
+        if not match:
             break
-    if not detalle:
-        m2 = re.match(r'\s*"?([^",)]+)"?', dentro)
-        if m2 and m2.group(1).strip():
-            detalle = m2.group(1).strip()
-
-    #  En los atajos generados en bucle el detalle es la propia variable, que
-    #  no dice nada: la combinación ya enseña el rango. Estos dos detalles son
-    #  PROSA, no identificadores, así que salen por `detalleFrase` y se
-    #  traducen; los demás («left», «togglesplit») son crudos y se quedan.
-    detalleFrase = ""
-    if detalle in ("i", "key"):
-        detalle, detalleFrase = "", T("el número")
-    elif detalle.startswith("m~"):
-        detalle, detalleFrase = "", T("en este monitor")
-
-    #  Un despachador que no conocemos no es prosa: su nombre limpio se pinta
-    #  tal cual y no se le pide traducción a nadie.
-    if not conocido:
-        return "", base + (" · " + detalle if detalle else ""), detalleFrase
-
-    #  La frase va SOLA, sin el « · » ni el detalle pegados. Se intentó
-    #  mandarla ya montada —«Cerrar la ventana · %1»— y no traducía nada: esa
-    #  cadena compuesta no está en la tabla, solo lo está la frase. Y tampoco
-    #  debería estarlo, porque el « · » es puntuación y no prosa: obligaría a
-    #  tener en traducciones/ una entrada por cada verbo Y por cada verbo con
-    #  detalle, el doble de cadenas para no decir nada nuevo.
-    #
-    #  Quien pinta las junta (`Atajos.hace`). Y si una frase necesita el hueco
-    #  en otro sitio —«Abrir %1», que no lleva separador— se lo pone ella.
-    return base, detalle, detalleFrase
+        combo = match.group(1)
+        if combo == "binds":
+            cursor = match.end()
+            continue
+        open_at = body.find("{", match.start(), match.end())
+        close_at = matching_brace(body, open_at)
+        if close_at < 0:
+            break
+        before = body[:match.start()]
+        section = "General"
+        for line in before.splitlines():
+            section_match = SECTION_RE.match(line)
+            if section_match:
+                section = section_match.group(1).strip().capitalize()
+        yield combo, body[open_at + 1:close_at], section
+        cursor = close_at + 1
 
 
-def leer():
-    vals = variables()
-    salida = []
-    for ruta in ficheros():
+def command_tokens(body):
+    match = re.search(r"\bspawn\s+((?:\"(?:\\.|[^\"\\])*\"[ \t]*)+)", body)
+    if not match:
+        return []
+    try:
+        return shlex.split(match.group(1))
+    except ValueError:
+        return []
+
+
+def describe(tokens, body):
+    if tokens:
+        if os.path.basename(tokens[0]) == "quickshell" and "ipc" in tokens:
+            try:
+                call = tokens.index("call")
+                target, function = tokens[call + 1:call + 3]
+                return "K4 · " + target + " · " + function
+            except (ValueError, IndexError):
+                pass
+        return " ".join(tokens[:8])
+    shell_spawn = re.search(r'\bspawn-sh\s+"((?:\\.|[^\"\\])*)"', body)
+    if shell_spawn:
+        return shell_spawn.group(1)
+    action = re.search(
+        r"\b(close-window|toggle-overview|focus-window|focus-workspace|"
+        r"move-window-to-workspace-down|move-window-to-workspace-up|"
+        r"switch-layout|consume-or-expel-window-left|consume-or-expel-window-right)\b",
+        body,
+    )
+    return action.group(1).replace("-", " ") if action else "Niri action"
+
+
+def read_bindings():
+    result = []
+    for path in included_files(NIRI_CONFIG):
         try:
-            lineas = open(ruta).read().split("\n")
+            source = open(path, encoding="utf-8").read()
         except OSError:
             continue
-        salida.extend(leer_fichero(lineas, vals))
-    return salida
-
-
-def leer_fichero(lineas, vals):
-    salida = []
-    seccion = "General"
-    bucle = None
-    alias = set()
-    hasta = ""
-
-    for linea in lineas:
-        limpia = linea.strip()
-
-        # títulos de sección: ---- ASÍ ---- o -- así
-        m = re.match(r'^-{2,}\s*(.+?)\s*-{2,}$', limpia)
-        if m and m.group(1).strip("- "):
-            seccion = m.group(1).strip("- ").capitalize()
-            continue
-        m = re.match(r'^--\s+([A-ZÁÉÍÓÚÑ][^.]{3,60})$', limpia)
-        if m:
-            seccion = m.group(1).strip()
-            continue
-
-        m = RE_FOR.match(linea)
-        if m:
-            bucle = m.group(1)
-            alias = {bucle}
-            hasta = vals.get(m.group(3), m.group(3))
-            continue
-        if limpia == "end":
-            bucle = None
-            alias = set()
-            continue
-
-        if bucle:
-            m = re.compile(RE_ALIAS.pattern % re.escape(bucle)).match(linea)
-            if m:
-                alias.add(m.group(1))
-                continue
-
-        m = RE_BIND.match(limpia)
-        if not m:
-            continue
-
-        tecla, accion = partir(m.group(1))
-        combo = resolver(tecla, vals, alias if bucle else None)
-        if "№" in combo:
-            combo = combo.replace("№", "1–" + str(hasta))
-
-        frase, detalle, detalleFrase = describir(accion, vals)
-        #  `hace` se queda: es lo que se pinta si no hay traducción que valga
-        #  y lo que busca quien teclea en español. La barra prefiere `frase`,
-        #  y esto la monta igual que ella —ver `Atajos.hace`— para que las dos
-        #  digan lo mismo cuando el idioma es el de casa.
-        sufijo = detalle or detalleFrase
-        if not frase:
-            hace = sufijo
-        elif "%1" in frase:
-            hace = frase.replace("%1", sufijo)
-        else:
-            hace = frase + (" · " + sufijo if sufijo else "")
-        salida.append({
-            "combo": combo.strip(),
-            "hace": hace,
-            "frase": frase,
-            "detalle": detalle,
-            "detalleFrase": detalleFrase,
-            "seccion": seccion,
-        })
-
-    return salida
+        for combo, body, section in binding_blocks(source):
+            detail = describe(command_tokens(body), body)
+            result.append({
+                "combo": combo,
+                "hace": detail,
+                "frase": "",
+                "detalle": detail,
+                "detalleFrase": "",
+                "seccion": section,
+                "archivo": os.path.basename(path),
+            })
+    return result
 
 
 def main():
-    atajos = leer()
-    print(json.dumps({"total": len(atajos), "atajos": atajos}), flush=True)
+    bindings = read_bindings()
+    print(json.dumps({"total": len(bindings), "atajos": bindings}, ensure_ascii=False), flush=True)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except (KeyboardInterrupt, BrokenPipeError):
-        sys.exit(0)
+    main()

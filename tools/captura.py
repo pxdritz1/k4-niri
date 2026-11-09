@@ -77,20 +77,8 @@ def region_con_slurp():
 
 
 def ventana_activa():
-    """Geometría de la ventana con el foco, tal y como la ve Hyprland."""
-    p = subprocess.run(["hyprctl", "-j", "activewindow"],
-                       capture_output=True, text=True)
-    if p.returncode != 0:
-        return None
-    try:
-        d = json.loads(p.stdout)
-    except json.JSONDecodeError:
-        return None
-    at, size = d.get("at"), d.get("size")
-    if not at or not size:
-        return None
-    return "%d,%d %dx%d" % (at[0], at[1], size[0], size[1])
-
+    """Niri does not expose window geometry through its public IPC."""
+    return None
 
 def recorte_magick(geometria):
     """De "X,Y WxH" (lo que habla grim) a "WxH+X+Y" (lo que habla magick)."""
@@ -110,15 +98,20 @@ def hacer_foto(args):
     if args.desde and not geometria:
         salir(ok=False, motivo="fallo", detalle="sin-geometria")
 
-    if args.ambito == "ventana" and not geometria:
-        geometria = ventana_activa()
-        if not geometria:
-            salir(ok=False, motivo="fallo", detalle="sin-ventana-activa")
-
     ruta = args.ruta or nombre("foto")
+    captura_nativa = args.ambito == "ventana" and not geometria and not args.desde
     os.makedirs(os.path.dirname(ruta), exist_ok=True)
 
-    if args.desde:
+    if captura_nativa:
+        # Niri can capture its focused window directly, but does not publish
+        # window geometry for grim. Its native action also copies to clipboard.
+        niri = shutil.which("niri")
+        if not niri:
+            salir(ok=False, motivo="fallo", detalle="niri-no-disponible")
+        orden = [niri, "msg", "action", "screenshot-window", "--path", ruta]
+        if args.cursor:
+            orden.append("--show-pointer")
+    elif args.desde:
         # Recortar de un fotograma ya congelado, en vez de volver a capturar.
         # Es lo que hace que lo que sale sea exactamente lo que veías al
         # encuadrar, y no lo que hubiera en pantalla al soltar el ratón.
@@ -145,8 +138,8 @@ def hacer_foto(args):
     ancho, alto = medir(ruta)
 
     # ── a dónde va ────────────────────────────────────────────────
-    copiada = False
-    if args.destino in ("portapapeles", "ambos"):
+    copiada = captura_nativa
+    if args.destino in ("portapapeles", "ambos") and not captura_nativa:
         # El `-t` explícito no sobra: sin él, una imagen pegada en otra
         # aplicación se degrada a lo que el portapapeles decida.
         with open(ruta, "rb") as f:

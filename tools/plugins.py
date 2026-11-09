@@ -1393,7 +1393,7 @@ AYUDA = """k4's plugin catalog.
     tools/plugins.py --search [text]    what's published in the registry
     tools/plugins.py --examine <url>    look at a plugin without installing it (JSON)
 
-    --pantalla <m>  with --test, open it on THAT monitor (`hyprctl monitors`)
+    --pantalla <m>  with --test, open it on THAT monitor (`Quickshell.screens`)
     --commit <sha>  install or update THAT commit, not the tip of the branch
     --folder <dir>  when plugin.json is not at the repo root
     --registry <url>  point at a registry other than the published one

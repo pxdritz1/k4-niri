@@ -17,7 +17,7 @@ Se mueve en RELATIVO y no en absoluto a propósito. Un dispositivo absoluto lo
 trata libinput como una tableta o una pantalla táctil, con su propio mapeado y
 sus sorpresas; con movimiento relativo basta con irse a una esquina —el cursor
 se queda pegado al borde— y contar desde ahí. La posición se comprueba luego
-preguntándosela a Hyprland, así que no hay que fiarse de la cuenta.
+consultando las coordenadas, pero Niri no ofrece esa consulta por IPC.
 """
 import fcntl, os, socket, struct, sys, time
 
@@ -49,21 +49,8 @@ BOTONES = {"clic": BTN_LEFT, "izquierdo": BTN_LEFT,
 
 
 def donde():
-    """Dónde está el cursor según Hyprland, o None."""
-    firma = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
-    runtime = os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
-    ruta = "%s/hypr/%s/.socket.sock" % (runtime, firma)
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(0.3)
-        s.connect(ruta)
-        s.sendall(b"cursorpos")
-        d = s.recv(256).decode()
-        s.close()
-        x, y = d.split(",")
-        return int(x.strip()), int(y.strip())
-    except (OSError, ValueError):
-        return None
+    """Niri IPC does not expose the pointer coordinates."""
+    return None
 
 
 class Raton:
@@ -106,7 +93,7 @@ class Raton:
             time.sleep(0.002)
 
     def ir_a(self, x, y):
-        """A una posición de pantalla, corrigiendo con lo que diga Hyprland."""
+        """A una posición aproximada; sin coordenadas del cursor no se puede corregir."""
         #  Si se sabe dónde está, se va en relativo desde ahí. Irse antes a la
         #  esquina parece más seguro y es peor: saca el puntero de lo que
         #  estuviera señalando, y cualquier cosa que reaccione al ratón —la
@@ -161,21 +148,30 @@ class Raton:
         """
         self.ir_a(x0, y0)
         self.abajo()
-        for i in range(1, tramos + 1):
-            objetivo_x = round(x0 + (x1 - x0) * i / tramos)
-            objetivo_y = round(y0 + (y1 - y0) * i / tramos)
-            # Se mira dónde está de verdad en cada tramo: la aceleración de
-            # puntero desvía la cuenta, y en un arrastre el desvío se acumula
-            # hasta soltar en otro sitio. Preguntarlo cuesta 0,02 ms.
-            p = donde()
-            if p is None:
-                break
-            self.paso(objetivo_x - p[0], objetivo_y - p[1])
-            time.sleep(0.02)
-
         p = donde()
-        if p is not None:
-            self.paso(x1 - p[0], y1 - p[1])
+        if p is None:
+            # Niri does not report pointer coordinates. Continue the drag using
+            # relative deltas from the requested start point.
+            anterior_x, anterior_y = x0, y0
+            for i in range(1, tramos + 1):
+                objetivo_x = round(x0 + (x1 - x0) * i / tramos)
+                objetivo_y = round(y0 + (y1 - y0) * i / tramos)
+                self.paso(objetivo_x - anterior_x, objetivo_y - anterior_y)
+                anterior_x, anterior_y = objetivo_x, objetivo_y
+                time.sleep(0.02)
+        else:
+            for i in range(1, tramos + 1):
+                objetivo_x = round(x0 + (x1 - x0) * i / tramos)
+                objetivo_y = round(y0 + (y1 - y0) * i / tramos)
+                p = donde()
+                if p is None:
+                    break
+                self.paso(objetivo_x - p[0], objetivo_y - p[1])
+                time.sleep(0.02)
+
+            p = donde()
+            if p is not None:
+                self.paso(x1 - p[0], y1 - p[1])
         time.sleep(0.05)
         self.arriba()
 

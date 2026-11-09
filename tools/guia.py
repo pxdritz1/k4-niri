@@ -19,7 +19,7 @@ Esto comprueba lo que se puede comprobar de verdad:
   · cada ejemplo en QML de la guía COMPILA, con qmllint y la API de verdad;
   · los números que la guía promete —64 px de icono, 1 MB, el alto máximo—
     son los que el código usa;
-  · cada atajo que se cita existe en hypr/k4.lua.
+  · cada atajo que se cita existe en niri/k4.kdl.in.
 
 Lo que NO comprueba —y conviene decirlo en vez de dar una falsa sensación de
 red— es si un párrafo en prosa describe bien lo que hace el código. Un ejemplo
@@ -246,21 +246,17 @@ def revisar_numeros(doc, texto):
 
 
 def revisar_atajos(doc, texto):
-    """Los atajos que la guía promete tienen que estar en hypr/k4.lua."""
-    lua = (RAIZ / "hypr" / "k4.lua").read_text()
+    """Los atajos que la guía promete tienen que estar en la plantilla Niri."""
+    kdl = (RAIZ / "niri" / "k4.kdl.in").read_text()
     fallos = []
-    for combo in set(re.findall(r"\bSUPER\+((?:SHIFT\+|ALT\+|CONTROL\+)*\w+)",
-                                texto)):
+    for combo in set(re.findall(r"\bSUPER\+((?:SHIFT\+|ALT\+|CONTROL\+)*\w+)", texto)):
         partes = combo.split("+")
-        tecla = partes[-1]
-        mods = partes[:-1]
-        #  En el lua se escribe `mod .. " + SHIFT + Space"`.
-        esperado = " + ".join(mods + [tecla])
-        if not re.search(r'mod \.\. " \+ %s"' % re.escape(esperado), lua):
-            fallos.append(f"{doc}: promete el atajo SUPER+{combo} y "
-                          f"hypr/k4.lua no lo ata")
+        tecla = partes[-1].title() if len(partes[-1]) > 1 else partes[-1]
+        mods = {"SHIFT": "Shift", "ALT": "Alt", "CONTROL": "Ctrl"}
+        esperado = "+".join(["Mod"] + [mods[p] for p in partes[:-1]] + [tecla])
+        if not re.search(r"^\s*" + re.escape(esperado) + r"\s*\{", kdl, re.M):
+            fallos.append(f"{doc}: promete o atalho SUPER+{combo} e niri/k4.kdl.in não o vincula")
     return fallos
-
 
 #  qmllint se muere EN SILENCIO —sale con 255 y sin una palabra— en cuanto ve
 #  una función con tipo de retorno, `function toggle(): void`. Y esas no son

@@ -15,7 +15,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 
 Singleton {
     id: sesion
@@ -40,10 +39,8 @@ Singleton {
 
     // ── acciones ──────────────────────────────────────────────────
     //
-    //  systemd-logind se encarga de todas menos cerrar sesión, que es del
-    //  compositor: salir de Hyprland cierra la sesión gráfica sin tirar de
-    //  `loginctl terminate-user`, que se llevaría por delante también lo que
-    //  tengas corriendo en un tty.
+    //  systemd-logind gestiona la energía. El cierre de sesión se delega al
+    //  compositor para no terminar procesos ajenos de otros TTY.
     function apagar()    { correr(["systemctl", "poweroff"]) }
     function reiniciar() { correr(["systemctl", "reboot"]) }
     function hibernar()  { correr(["systemctl", "hibernate"]) }
@@ -55,7 +52,7 @@ Singleton {
         dormir.start()
     }
 
-    function cerrarSesion() { Hyprland.dispatch("hl.dsp.exit()") }
+    function cerrarSesion() { Niri.quit() }
 
     function correr(cmd) {
         accion.command = cmd

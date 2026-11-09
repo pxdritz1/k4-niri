@@ -56,7 +56,7 @@ Singleton {
         { id: "panel", title: Idioma.t("Centro de control"), version: "1.0.0", enabled: true },
         { id: "launcher", title: Idioma.t("Lanzador"), version: "1.0.0", enabled: true },
         { id: "ask", title: Idioma.t("Preguntar"), version: "1.0.0", enabled: true },
-        { id: "hyprtheme", title: Idioma.t("Tema de Hyprland"), version: "1.0.0", enabled: true },
+        { id: "hyprtheme", title: Idioma.t("Tema de Hyprland"), version: "1.0.0", enabled: false },
         { id: "weather", title: Idioma.t("El tiempo"), version: "1.0.0", enabled: true },
         { id: "tray", title: Idioma.t("Bandeja"), version: "1.0.0", enabled: true },
         { id: "game", title: Idioma.t("Mazmorra"), version: "1.0.0", enabled: true },
@@ -461,9 +461,14 @@ Singleton {
         return i >= 0 ? catalogo[i] : null
     }
 
+    function esIncompatible(id) {
+        return !!Quickshell.env("NIRI_SOCKET")
+            && ["hyprtheme", "pantallas", "submap", "dual", "atalaya"].indexOf(id) !== -1
+    }
+
     function estaHabilitado(id) {
         const m = metadata(id)
-        if (!m)
+        if (!m || esIncompatible(id))
             return false
         return habilitados[id] !== undefined ? !!habilitados[id] : m.enabled !== false
     }
@@ -474,7 +479,7 @@ Singleton {
     }
 
     function poner(id, valor) {
-        if (indice(id) < 0 || !puedeConfigurar(id))
+        if (indice(id) < 0 || !puedeConfigurar(id) || esIncompatible(id))
             return
         const d = Object.assign({}, habilitados)
         d[id] = !!valor
