@@ -89,7 +89,7 @@ printf 'Wrote %s\n' "$K4_BINDINGS"
 if [ "$NO_RESTART" -eq 1 ]; then
     printf 'Niri reload skipped by request.\n'
 elif command -v niri >/dev/null 2>&1; then
-    niri msg action reload-config 2>/dev/null || {
-        printf 'Could not reload Niri automatically; run: niri msg action reload-config\n'
+    niri msg action load-config-file 2>/dev/null || {
+        printf 'Could not reload Niri automatically; run: niri msg action load-config-file\n'
     }
 fi
