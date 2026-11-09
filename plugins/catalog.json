@@ -72,7 +72,7 @@
    "entry": "HyprTheme/HyprThemePlugin.qml",
    "version": "1.0.0",
    "title": "Tema de Hyprland",
-   "enabledByDefault": true,
+   "enabledByDefault": false,
    "icono": "0xF03D8"
   },
   {
@@ -81,7 +81,7 @@
    "version": "1.0.0",
    "title": "Pantallas",
    "description": "Configura monitores y reparte escritorios de Hyprland",
-   "enabledByDefault": true,
+   "enabledByDefault": false,
    "icono": "0xF037A",
    "aplicacion": true,
    "permisos": [
@@ -266,7 +266,7 @@
    "entry": "Submap/SubmapPlugin.qml",
    "version": "1.0.0",
    "title": "Submapa",
-   "enabledByDefault": true,
+   "enabledByDefault": false,
    "icono": "0xF030E"
   }
  ],
