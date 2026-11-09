@@ -85,6 +85,9 @@ jobs:
           print(f"{len(files)} módulos Python analisados")
           PY
 
+      - name: Testar leitura recursiva de atalhos KDL
+        run: python3 tools/prueba_atajos.py
+
       - name: Validar sintaxe dos instaladores shell
         run: |
           bash -n instalar
