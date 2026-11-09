@@ -56,7 +56,7 @@ Singleton {
         { id: "panel", title: Idioma.t("Centro de control"), version: "1.0.0", enabled: true },
         { id: "launcher", title: Idioma.t("Lanzador"), version: "1.0.0", enabled: true },
         { id: "ask", title: Idioma.t("Preguntar"), version: "1.0.0", enabled: true },
-        { id: "hyprtheme", title: Idioma.t("Tema de Hyprland"), version: "1.0.0", enabled: true },
+        { id: "hyprtheme", title: Idioma.t("Tema de Hyprland"), version: "1.0.0", enabled: false },
         { id: "weather", title: Idioma.t("El tiempo"), version: "1.0.0", enabled: true },
         { id: "tray", title: Idioma.t("Bandeja"), version: "1.0.0", enabled: true },
         { id: "game", title: Idioma.t("Mazmorra"), version: "1.0.0", enabled: true },
