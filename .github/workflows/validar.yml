@@ -10,7 +10,7 @@ name: validar
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/niri-port]
   pull_request:
 
 jobs:
@@ -62,3 +62,38 @@ jobs:
 
       - name: Sin restos de conflictos ni espacios colgando
         run: git diff --check
+
+  port-niri:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Validar sintaxe de todos os módulos Python
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast
+          files = sorted(Path(".").rglob("*.py"))
+          for path in files:
+              if any(part in {".git", ".venv", "venv", "__pycache__"} for part in path.parts):
+                  continue
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+          print(f"{len(files)} módulos Python analisados")
+          PY
+
+      - name: Validar sintaxe dos instaladores shell
+        run: |
+          bash -n instalar
+          bash -n instalar-niri
+
+      - name: Instalar qmllint
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-declarative-dev-tools
+
+      - name: Validar sintaxe QML das integrações Niri
+        run: |
+          qmllint --help >/dev/null
+          qmllint --bare services/Niri.qml services/Workspaces.qml services/Ventanas.qml services/Island.qml services/Notifs.qml services/Digivice.qml services/Sesion.qml services/Submapas.qml api/K4/Miniatura.qml
