@@ -244,7 +244,7 @@
    "entry": "Dual/DualPlugin.qml",
    "version": "1.0.0",
    "title": "Modo dual",
-   "enabledByDefault": true,
+   "enabledByDefault": false,
    "permisos": [
     "procesos"
    ]
@@ -254,7 +254,7 @@
    "entry": "Atalaya/AtalayaPlugin.qml",
    "version": "1.0.0",
    "title": "Atalaya",
-   "enabledByDefault": true,
+   "enabledByDefault": false,
    "icono": "0xF0570",
    "aplicacion": true,
    "permisos": [
