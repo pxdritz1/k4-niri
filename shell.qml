@@ -255,7 +255,7 @@ Scope {
         function nextTrack(): void { Media.siguiente() }
         function prevTrack(): void { Media.anterior() }
         //  El tema ya no tiene pantalla propia: todo lo que se configura vive
-        //  en Ajustes. Se conserva el verbo porque está atado en Hyprland y en
+        //  en Ajustes. Se conserva el verbo porque está atado en la configuración del compositor y en
         //  el centro de control, y romper un atajo de alguien por mudar una
         //  pantalla de sitio es de mala educación. Ahora aterriza en la página
         //  de apariencia, que es donde vive el color que configuraba.
