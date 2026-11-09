@@ -17,7 +17,7 @@ Se mueve en RELATIVO y no en absoluto a propósito. Un dispositivo absoluto lo
 trata libinput como una tableta o una pantalla táctil, con su propio mapeado y
 sus sorpresas; con movimiento relativo basta con irse a una esquina —el cursor
 se queda pegado al borde— y contar desde ahí. La posición se comprueba luego
-preguntándosela a Hyprland, así que no hay que fiarse de la cuenta.
+consultando las coordenadas, pero Niri no ofrece esa consulta por IPC.
 """
 import fcntl, os, socket, struct, sys, time
 
