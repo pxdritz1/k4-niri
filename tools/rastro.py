@@ -11,12 +11,7 @@ La posición se pide por el socket de Hyprland y no con `hyprctl cursorpos`:
 medido, la consulta cuesta 0,019 ms, mientras que lanzar un proceso treinta
 veces por segundo se nota. A 30 Hz esto es un 0,06 % de un hilo.
 """
-import argparse, json, os, select, signal, socket, sys, time
-
-# ── el socket de peticiones de Hyprland ───────────────────────────
-FIRMA = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
-RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
-SOCKET = "%s/hypr/%s/.socket.sock" % (RUNTIME, FIRMA)
+import argparse, json, os, select, signal, sys, time
 
 parar = False
 
@@ -26,35 +21,9 @@ def al_cortar(*_):
     parar = True
 
 
-def preguntar(orden):
-    """Una consulta al compositor. Devuelve texto, o None si no contesta."""
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(0.2)
-        s.connect(SOCKET)
-        s.sendall(orden.encode())
-        trozos = []
-        while True:
-            d = s.recv(4096)
-            if not d:
-                break
-            trozos.append(d)
-        s.close()
-        return b"".join(trozos).decode()
-    except (OSError, socket.timeout):
-        return None
-
-
 def posicion():
-    """El cursor, en coordenadas globales. `cursorpos` devuelve «582, 859»."""
-    t = preguntar("cursorpos")
-    if not t:
-        return None
-    try:
-        x, y = t.split(",")
-        return int(x.strip()), int(y.strip())
-    except ValueError:
-        return None
+    """Niri does not expose global pointer coordinates through its IPC."""
+    return None
 
 
 def main():
@@ -66,10 +35,6 @@ def main():
 
     signal.signal(signal.SIGINT, al_cortar)
     signal.signal(signal.SIGTERM, al_cortar)
-
-    if not os.path.exists(SOCKET):
-        print(json.dumps({"ok": False, "motivo": "sin-socket"}), flush=True)
-        return 1
 
     os.makedirs(os.path.dirname(args.salida), exist_ok=True)
     intervalo = 1.0 / args.hz
@@ -85,7 +50,7 @@ def main():
 
         # El latido por stdout le sirve a quien nos lanzó para saber que
         # seguimos vivos sin tener que leer el fichero.
-        print(json.dumps({"ok": True, "estado": "rastreando"}), flush=True)
+        print(json.dumps({"ok": True, "estado": "rastreando-sin-coordenadas"}), flush=True)
 
         muestras = 0
         while not parar:
