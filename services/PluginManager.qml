@@ -463,7 +463,7 @@ Singleton {
 
     function esIncompatible(id) {
         return !!Quickshell.env("NIRI_SOCKET")
-            && ["hyprtheme", "pantallas", "submap"].indexOf(id) !== -1
+            && ["hyprtheme", "pantallas", "submap", "dual", "atalaya"].indexOf(id) !== -1
     }
 
     function estaHabilitado(id) {
