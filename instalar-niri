@@ -2,7 +2,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-DESTINO=${K4_DESTINO:-$HOME/.config/quickshell/k4}
+DESTINO=${K4_DESTINO:-$ROOT}
 NIRI_CONFIG=${NIRI_CONFIG:-$HOME/.config/niri/config.kdl}
 K4_BINDINGS=${K4_NIRI_BINDINGS:-$HOME/.config/niri/k4.kdl}
 MARKER='# k4-niri: managed include'
@@ -62,7 +62,9 @@ fi
 
 mkdir -p "$DESTINO" "$(dirname -- "$K4_BINDINGS")"
 if [ "$ROOT" != "$DESTINO" ]; then
-    cp -R "$ROOT/." "$DESTINO/"
+    printf "K4_DESTINO differs from the source tree; this installer does not copy project files.\\n" >&2
+    printf "Run the installer from the installed K4 directory, or unset K4_DESTINO.\\n" >&2
+    exit 2
 fi
 
 # Preserve the Niri config byte-for-byte except for one appended include.
