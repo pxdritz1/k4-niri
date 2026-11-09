@@ -123,9 +123,10 @@ Singleton {
 
     Io.Process {
         id: actionProcess
-        onExited: {
+        onExited: function (code) {
             root.actionRunning = false
-            if (exitCode !== 0) root.lastError = "niri action failed: " + command.join(" ")
+            if (code !== 0)
+                root.lastError = "niri action failed: " + actionProcess.command.join(" ")
             root.runNextAction()
         }
     }
