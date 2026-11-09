@@ -1,100 +1,123 @@
 pragma Singleton
-
 import QtQuick
 import Quickshell
 import Quickshell.Io as Io
 
 Singleton {
     id: root
-
     property var workspaces: []
     property var windows: []
-    property var fullscreenByOutput: ({})
+    property var outputs: []
     property string focusedOutput: ""
     property bool connected: false
+    property string lastError: ""
+    property var pendingActions: []
+    property bool actionRunning: false
 
     function handleLine(line) {
         let event
-        try {
-            event = JSON.parse(line)
-        } catch (error) {
-            console.warn("K4 Niri IPC: invalid event JSON", error)
-            return
-        }
-
+        try { event = JSON.parse(line) }
+        catch (error) { console.warn("K4 Niri IPC: invalid event JSON", error); return }
         const name = Object.keys(event)[0]
         const data = event[name]
-        if (!name || !data)
-            return
+        if (!name || data === undefined) return
 
-        if (name === "WorkspacesChanged") {
+        switch (name) {
+        case "WorkspacesChanged":
             workspaces = data.workspaces || []
             updateFocusedOutput()
-            updateFullscreen()
-        } else if (name === "WorkspaceActivated") {
-            const next = workspaces.slice()
-            for (let i = 0; i < next.length; ++i) {
-                if (next[i].id === data.id)
-                    next[i] = Object.assign({}, next[i], { is_active: true, is_focused: !!data.focused })
-                else if (data.focused)
-                    next[i] = Object.assign({}, next[i], { is_focused: false })
-            }
-            workspaces = next
+            break
+        case "WorkspaceActivated":
+            workspaces = workspaces.map(item => Object.assign({}, item, {
+                is_active: item.id === data.id ? true : item.is_active,
+                is_focused: data.focused ? item.id === data.id
+                    : (item.id === data.id ? false : item.is_focused)
+            }))
             updateFocusedOutput()
-        } else if (name === "WindowsChanged") {
+            break
+        case "WindowsChanged":
             windows = data.windows || []
-            updateFullscreen()
-        } else if (name === "WindowOpenedOrChanged") {
+            break
+        case "WindowOpenedOrChanged": {
+            if (!data.window) break
             const next = windows.slice()
-            const window = data.window
-            const index = next.findIndex(item => item.id === window.id)
-            if (index < 0)
-                next.push(window)
-            else
-                next[index] = window
+            const index = next.findIndex(item => item.id === data.window.id)
+            if (index < 0) next.push(data.window)
+            else next[index] = data.window
             windows = next
-            updateFullscreen()
-        } else if (name === "WindowClosed") {
+            break
+        }
+        case "WindowClosed":
             windows = windows.filter(item => item.id !== data.id)
-            updateFullscreen()
-        } else if (name === "WindowFocusChanged") {
-            const next = windows.map(item => Object.assign({}, item, { is_focused: item.id === data.id }))
-            windows = next
-            updateFocusedOutput()
+            break
+        case "WindowFocusChanged":
+            windows = windows.map(item => Object.assign({}, item, { is_focused: item.id === data.id }))
+            break
+        case "OutputsChanged":
+            outputs = data.outputs || []
+            break
+        case "ConfigLoaded":
+            lastError = ""
+            break
         }
     }
 
     function updateFocusedOutput() {
         const focused = workspaces.find(item => item.is_focused)
-        if (focused && focused.output)
-            focusedOutput = String(focused.output)
+        if (focused && focused.output) focusedOutput = String(focused.output)
     }
 
-    function updateFullscreen() {
-        const result = ({})
-        for (let i = 0; i < workspaces.length; ++i) {
-            const workspace = workspaces[i]
-            const output = String(workspace.output || "")
-            if (!output)
-                continue
-            const hasFullscreen = windows.some(window =>
-                window.workspace_id === workspace.id && !!window.is_fullscreen)
-            result[output] = hasFullscreen
-        }
-        fullscreenByOutput = result
+    function action(name, args) {
+        if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) return false
+        const command = ["niri", "msg", "action", name]
+        for (let i = 0; i < (args || []).length; ++i) command.push(String(args[i]))
+        pendingActions = pendingActions.concat([command])
+        runNextAction()
+        return true
     }
 
-    Io.SplitParser {
-        id: eventParser
-        onRead: line => root.handleLine(line)
+    function focusWindow(id) { return action("focus-window", ["--id", id]) }
+    function closeWindow(id) { return action("close-window", ["--id", id]) }
+    function focusWorkspace(index) { return action("focus-workspace", [index]) }
+
+    function runNextAction() {
+        if (actionRunning || pendingActions.length === 0) return
+        const next = pendingActions[0]
+        pendingActions = pendingActions.slice(1)
+        actionProcess.command = next
+        actionRunning = true
+        actionProcess.running = true
     }
+
+    Io.SplitParser { id: eventParser; onRead: line => root.handleLine(line) }
 
     Io.Process {
         id: eventStream
         command: ["niri", "msg", "--json", "event-stream"]
         running: true
         stdout: eventParser
+        stderr: Io.SplitParser {
+            onRead: line => {
+                if (String(line).trim().length > 0) root.lastError = String(line)
+            }
+        }
         onStarted: root.connected = true
-        onExited: root.connected = false
+        onExited: { root.connected = false; reconnect.restart() }
+    }
+
+    Io.Process {
+        id: actionProcess
+        onExited: {
+            root.actionRunning = false
+            if (exitCode !== 0) root.lastError = "niri action failed: " + command.join(" ")
+            root.runNextAction()
+        }
+    }
+
+    Timer {
+        id: reconnect
+        interval: 1500
+        repeat: false
+        onTriggered: eventStream.running = true
     }
 }
