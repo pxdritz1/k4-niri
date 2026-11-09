@@ -2134,6 +2134,7 @@ Singleton {
     //  una aplicación, que es el tranco más largo. No se mira cuál: solo
     //  cuántas hay, igual que solo se mira QUE hubo un cambio de ventana.
     property int _cuantasVentanas: 0
+    property int _idVentanaEnfocada: -1
 
     function _pasoPorActividad() {
         if (!indiceListo)
@@ -2172,7 +2173,14 @@ Singleton {
     //  su propio paso aunque la ventana enfocada siga siendo la misma.
     Connections {
         target: Niri
-        function onWindowsChanged() { dv._pasoPorActividad() }
+        function onWindowsChanged() {
+            const focused = Niri.windows.find(window => window.is_focused)
+            const id = focused ? Number(focused.id) : -1
+            if (id === dv._idVentanaEnfocada)
+                return
+            dv._idVentanaEnfocada = id
+            dv._pasoPorActividad()
+        }
         function onWorkspacesChanged() { dv._pasoPorEscritorio() }
     }
 
