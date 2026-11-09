@@ -152,7 +152,7 @@ Singleton {
     property var porPantalla: ({})
     property string comun: ""
 
-    //  Los huecos de Hyprland viven en el mismo fichero, y los pide quien dibuje
+    //  Los márgenes de la vista previa viven en el mismo fichero, y los pide quien dibuje
     //  una previsualización del escritorio: una ventana pegada a los bordes
     //  enseñaría algo que no pasa.
     property int huecos: 8
