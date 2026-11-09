@@ -3,8 +3,9 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DESTINO=${K4_DESTINO:-$ROOT}
-NIRI_CONFIG=${NIRI_CONFIG:-$HOME/.config/niri/config.kdl}
-K4_BINDINGS=${K4_NIRI_BINDINGS:-$HOME/.config/niri/k4.kdl}
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+NIRI_CONFIG=${NIRI_CONFIG:-$CONFIG_HOME/niri/config.kdl}
+K4_BINDINGS=${K4_NIRI_BINDINGS:-$CONFIG_HOME/niri/k4.kdl}
 MARKER='// k4-niri: managed include'
 
 usage() {
