@@ -7,7 +7,6 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 
 Singleton {
@@ -36,9 +35,9 @@ Singleton {
     }
 
     function pantallaConFoco() {
-        const monitor = Hyprland.focusedMonitor
-        if (monitor && monitor.name)
-            return monitor.name
+        const monitor = Niri.focusedOutput
+        if (monitor)
+            return monitor
         return Quickshell.screens.length > 0 ? Quickshell.screens[0].name : ""
     }
 
