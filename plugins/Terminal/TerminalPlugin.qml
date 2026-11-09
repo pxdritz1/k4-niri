@@ -1058,7 +1058,7 @@ K4Plugin {
             }
         }
 
-        //  Abrir donde estás mirando: se pregunta a Hyprland por la ventana
+        //  Abrir donde estás mirando: se consulta el estado de ventanas de Niri
         //  con foco y se baja por el árbol de procesos hasta el último hijo
         //  —el intérprete que de verdad tiene el directorio— para leerle el
         //  cwd. Si algo falla, cae en abrir sin más.
