@@ -78,7 +78,18 @@ Singleton {
 
     function focusWindow(id) { return action("focus-window", ["--id", id]) }
     function closeWindow(id) { return action("close-window", ["--id", id]) }
+    function toggleFullscreen(id) {
+        return action("fullscreen-window", id === undefined ? [] : ["--id", id])
+    }
+    function toggleFloating(id) {
+        return action("toggle-window-floating", id === undefined ? [] : ["--id", id])
+    }
     function focusWorkspace(index) { return action("focus-workspace", [index]) }
+    function focusWorkspaceDown() { return action("focus-workspace-down") }
+    function focusWorkspaceUp() { return action("focus-workspace-up") }
+    function toggleOverview() { return action("toggle-overview") }
+    function reloadConfig() { return action("load-config-file") }
+    function quit() { return action("quit") }
 
     function runNextAction() {
         if (actionRunning || pendingActions.length === 0) return
