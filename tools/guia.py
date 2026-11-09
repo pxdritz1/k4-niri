@@ -249,12 +249,12 @@ def revisar_atajos(doc, texto):
     """Los atajos que la guía promete tienen que estar en la plantilla Niri."""
     kdl = (RAIZ / "niri" / "k4.kdl.in").read_text()
     fallos = []
-    for combo in set(re.findall(r"\\bSUPER\\+((?:SHIFT\\+|ALT\\+|CONTROL\\+)*[A-Z0-9]+)", texto)):
+    for combo in set(re.findall(r"\bSUPER\+((?:SHIFT\+|ALT\+|CONTROL\+)*[A-Z0-9]+)", texto)):
         partes = combo.split("+")
         tecla = partes[-1].title() if len(partes[-1]) > 1 else partes[-1]
         mods = {"SHIFT": "Shift", "ALT": "Alt", "CONTROL": "Ctrl"}
         esperado = "+".join(["Mod"] + [mods[p] for p in partes[:-1]] + [tecla])
-        if not re.search(r"^\\s*" + re.escape(esperado) + r"\\s*\\{", kdl, re.M):
+        if not re.search(r"^\s*" + re.escape(esperado) + r"\s*\{", kdl, re.M):
             fallos.append(f"{doc}: promete o atalho SUPER+{combo} e niri/k4.kdl.in não o vincula")
     return fallos
 
