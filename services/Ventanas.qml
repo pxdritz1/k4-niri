@@ -2,7 +2,6 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io as Io
 
 Singleton {
     id: ventanas
@@ -26,9 +25,8 @@ Singleton {
 
     readonly property var espaciosVistos: {
         const ids = ({})
-        const workspaces = Niri.workspaces
-        for (let i = 0; i < workspaces.length; ++i) {
-            const workspace = workspaces[i]
+        for (let i = 0; i < Niri.workspaces.length; ++i) {
+            const workspace = Niri.workspaces[i]
             if (workspace.is_active)
                 ids[workspace.id] = true
         }
@@ -52,8 +50,7 @@ Singleton {
 
     function icono(window) {
         const id = clase(window)
-        if (!id)
-            return ""
+        if (!id) return ""
         let path = Quickshell.iconPath(id, true)
         if (path) return path
         path = Quickshell.iconPath(id.toLowerCase(), true)
@@ -74,8 +71,7 @@ Singleton {
 
     function titulo(window) {
         const id = clase(window).toLowerCase()
-        if (!id)
-            return Idioma.t("Ventana")
+        if (!id) return Idioma.t("Ventana")
         const apps = DesktopEntries.applications.values
         for (let i = 0; i < apps.length; ++i) {
             if (String(apps[i].id || "").toLowerCase() === id)
@@ -86,37 +82,24 @@ Singleton {
 
     function activar(window) {
         const id = direccion(window)
-        if (id)
-            ejecutar(["niri", "msg", "action", "focus-window", "--id", id])
+        if (id) Niri.focusWindow(id)
     }
 
     function cerrar(window) {
         const id = direccion(window)
-        if (id)
-            ejecutar(["niri", "msg", "action", "close-window", "--id", id])
+        if (id) Niri.closeWindow(id)
     }
 
-    function ejecutar(command) {
-        if (action.running)
-            return
-        actionCommand = command
-        action.running = true
-    }
-
-    property var actionCommand: []
-    Io.Process {
-        id: action
-        command: ventanas.actionCommand
-        running: false
-        onExited: running = false
-    }
-
-    onWindowsChanged: {
-        const focused = Niri.windows.find(window => window.is_focused)
-        pidActivo = focused && focused.pid !== undefined ? String(focused.pid) : ""
-        if (!focused)
-            return
-        const id = String(focused.id)
-        recientes = [id].concat(recientes.filter(item => item !== id)).slice(0, 40)
+    Connections {
+        target: Niri
+        function onWindowsChanged() {
+            const focused = Niri.windows.find(window => window.is_focused)
+            ventanas.pidActivo = focused && focused.pid !== undefined ? String(focused.pid) : ""
+            if (!focused) return
+            const id = String(focused.id)
+            ventanas.recientes = [id].concat(
+                ventanas.recientes.filter(item => item !== id)
+            ).slice(0, 40)
+        }
     }
 }
