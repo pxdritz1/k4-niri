@@ -3,5 +3,6 @@
 import QtQuick
 Item {
     property string name: ""
+    readonly property bool disponible: false
     signal activated()
 }
