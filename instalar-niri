@@ -79,7 +79,10 @@ else
     printf 'Backed up config to %s.k4-niri.bak\n' "$NIRI_CONFIG"
 fi
 
-sed "s|@K4_PATH@|$(printf '%s' "$DESTINO" | sed 's/[&|]/\\&/g')|g" \
+K4_PATH_ESC=$(printf '%s' "$DESTINO" | sed 's/[\\&|]/\\&/g')
+NIRI_CONFIG_ESC=$(printf '%s' "$NIRI_CONFIG" | sed 's/[\\&|]/\\&/g')
+sed -e "s|@K4_PATH@|$K4_PATH_ESC|g" \
+    -e "s|@NIRI_CONFIG@|$NIRI_CONFIG_ESC|g" \
     "$ROOT/niri/k4.kdl.in" > "$K4_BINDINGS"
 printf 'Wrote %s\n' "$K4_BINDINGS"
 
