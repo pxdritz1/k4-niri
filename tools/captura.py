@@ -138,7 +138,7 @@ def hacer_foto(args):
     ancho, alto = medir(ruta)
 
     # ── a dónde va ────────────────────────────────────────────────
-    copiada = False
+    copiada = captura_nativa
     if args.destino in ("portapapeles", "ambos") and not captura_nativa:
         # El `-t` explícito no sobra: sin él, una imagen pegada en otra
         # aplicación se degrada a lo que el portapapeles decida.
