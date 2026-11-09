@@ -209,7 +209,7 @@ Singleton {
     //
     //  Buscar por clase da con «una ventana de esa aplicación», y con una
     //  abierta eso basta. Con dos no: dos terminales abiertas son dos k4term
-    //  iguales, y la lista de Hyprland va por orden de creación, así que el
+    //  iguales, y la lista de Niri mantiene el estado actual de las ventanas, así que el
     //  clic en «te está esperando» llevaba siempre a la más vieja — a la de al
     //  lado, la mitad de las veces.
     //
@@ -333,20 +333,18 @@ Singleton {
     //  acierto de más se lleva por delante avisos que no ha leído nadie. Una
     //  pestaña del navegador titulada «Slack» borraría los de Slack.
     function descartarDeVentana(t) {
-        const d = t && t.lastIpcObject ? t.lastIpcObject : null
-        if (!d)
+        if (!t)
             return
 
-        const cls = String(d.class || "").toLowerCase()
-        const initial = String(d.initialClass || "").toLowerCase()
-        if (cls.length === 0 && initial.length === 0)
+        const cls = String(t.app_id || "").toLowerCase()
+        if (cls.length === 0)
             return
 
         // se copia antes: descartar muta la lista mientras se recorre
         const list = server.trackedNotifications.values.slice()
         let idas = 0
         for (let i = 0; i < list.length; ++i) {
-            if (!casa(clasesDe(list[i]), cls, initial))
+            if (!casa(clasesDe(list[i]), cls, ""))
                 continue
             if (latest === list[i])
                 dismissToast()
@@ -362,7 +360,7 @@ Singleton {
 
     //  Y para lo que no tiene ventana que enfocar. La terminal de la isla vive
     //  DENTRO de la barra: abrir su pestaña es haber atendido la campana, pero
-    //  ahí no cambia el foco de Hyprland y su notificación se quedaba puesta.
+    //  ahí no cambia el foco de el compositor y su notificación se quedaba puesta.
     //  Quien sepa que algo ya está atendido lo dice, y aquí se retira.
     function descartarDeApp(app, cuerpo) {
         const quien = String(app || "").toLowerCase()
