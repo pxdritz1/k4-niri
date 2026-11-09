@@ -1,0 +1,90 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+DESTINO=${K4_DESTINO:-$HOME/.config/quickshell/k4}
+NIRI_CONFIG=${NIRI_CONFIG:-$HOME/.config/niri/config.kdl}
+K4_BINDINGS=${K4_NIRI_BINDINGS:-$HOME/.config/niri/k4.kdl}
+MARKER='# k4-niri: managed include'
+
+usage() {
+    cat <<'EOF'
+Install K4's Niri integration without replacing your Niri configuration.
+
+Usage:
+  ./instalar-niri [--dry-run] [--yes] [--no-restart]
+
+Environment:
+  K4_DESTINO          K4 installation directory
+  NIRI_CONFIG         Niri main configuration file
+  K4_NIRI_BINDINGS    K4-generated KDL bindings file
+EOF
+}
+
+DRY_RUN=0
+YES=0
+NO_RESTART=0
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run|-n) DRY_RUN=1 ;;
+        --yes|-y) YES=1 ;;
+        --no-restart) NO_RESTART=1 ;;
+        --help|-h) usage; exit 0 ;;
+        *) printf 'Unknown option: %s\n' "$arg" >&2; usage >&2; exit 2 ;;
+    esac
+done
+
+[ -f "$NIRI_CONFIG" ] || {
+    printf 'Niri config not found: %s\n' "$NIRI_CONFIG" >&2
+    printf 'Set NIRI_CONFIG to your active config file.\n' >&2
+    exit 1
+}
+[ -f "$ROOT/niri/k4.kdl.in" ] || {
+    printf 'Missing template: %s/niri/k4.kdl.in\n' "$ROOT" >&2
+    exit 1
+}
+
+printf 'K4 source: %s\nK4 install: %s\nNiri config: %s\nK4 bindings: %s\n' \
+    "$ROOT" "$DESTINO" "$NIRI_CONFIG" "$K4_BINDINGS"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf 'Dry run: no changes made.\n'
+    exit 0
+fi
+if [ "$YES" -ne 1 ] && [ -t 0 ]; then
+    printf 'Proceed? [y/N] '
+    read -r answer || answer=''
+    case "$answer" in y|Y|yes|YES) ;; *) printf 'Cancelled.\n'; exit 0 ;; esac
+elif [ "$YES" -ne 1 ]; then
+    printf 'Non-interactive mode requires --yes.\n' >&2
+    exit 2
+fi
+
+mkdir -p "$DESTINO" "$(dirname -- "$K4_BINDINGS")"
+if [ "$ROOT" != "$DESTINO" ]; then
+    cp -R "$ROOT/." "$DESTINO/"
+fi
+
+# Preserve the Niri config byte-for-byte except for one appended include.
+if grep -Fq "$K4_BINDINGS" "$NIRI_CONFIG"; then
+    printf 'Include already present in %s.\n' "$NIRI_CONFIG"
+else
+    cp -p "$NIRI_CONFIG" "$NIRI_CONFIG.k4-niri.bak"
+    {
+        printf '\n%s\n' "$MARKER"
+        printf 'include "%s"\n' "$K4_BINDINGS"
+    } >> "$NIRI_CONFIG"
+    printf 'Backed up config to %s.k4-niri.bak\n' "$NIRI_CONFIG"
+fi
+
+sed "s|@K4_PATH@|$(printf '%s' "$DESTINO" | sed 's/[&|]/\\&/g')|g" \
+    "$ROOT/niri/k4.kdl.in" > "$K4_BINDINGS"
+printf 'Wrote %s\n' "$K4_BINDINGS"
+
+if [ "$NO_RESTART" -eq 1 ]; then
+    printf 'Niri reload skipped by request.\n'
+elif command -v niri >/dev/null 2>&1; then
+    niri msg action reload-config 2>/dev/null || {
+        printf 'Could not reload Niri automatically; run: niri msg action reload-config\n'
+    }
+fi
