@@ -15,7 +15,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 
 Singleton {
     id: captura
@@ -106,7 +105,7 @@ Singleton {
         destapar.stop()
         Island.escondida = true
 
-        //  Pedir a Hyprland las medidas de las ventanas otra vez. Las que trae
+        //  Pedir el estado de ventanas actualizado al IPC de Niri. Las que trae
         //  de serie son las de la última vez que pasó algo, y «algo» puede ser
         //  de hace horas: al arrancar la barra reserva su franja y las ventanas
         //  encogen, pero esa lista se quedó con las de antes. Señalar una
@@ -707,7 +706,7 @@ Singleton {
     //
     //  Va en su propio proceso y no aquí porque hay que muestrear a 30 Hz sin
     //  competir con el hilo de dibujo de la barra. Se le hablan los clics por
-    //  la entrada estándar: Hyprland no los publica por su socket de eventos,
+    //  la entrada estándar: Niri no publica eventos de clic por su IPC,
     //  así que los recoge un atajo global y se los pasamos.
     property string rutaRastro: ""
 
@@ -1180,23 +1179,8 @@ Singleton {
     // cuanto hay dos, capturar «la pantalla» sin decir cuál captura las dos
     // pegadas, que no es lo que nadie espera.
     function monitorActual() {
-        const m = Hyprland.focusedMonitor
-        if (m && m.name)
-            return m.name
-
-        // En algunas versiones de Quickshell `focusedMonitor` puede quedarse
-        // nulo al cambiar de configuración de pantallas. El modelo de
-        // monitores sí conserva el monitor enfocado; úsalo antes de caer a la
-        // primera pantalla como último recurso.
-        const monitores = Hyprland.monitors && Hyprland.monitors.values
-            ? Hyprland.monitors.values : []
-        for (let i = 0; i < monitores.length; ++i) {
-            const monitor = monitores[i]
-            const datos = monitor && monitor.lastIpcObject
-            if (monitor && monitor.name
-                    && (monitor.focused || (datos && datos.focused)))
-                return monitor.name
-        }
+        if (Niri.focusedOutput)
+            return Niri.focusedOutput
 
         const pantallas = Quickshell.screens
         return pantallas && pantallas.length > 0 && pantallas[0].name
