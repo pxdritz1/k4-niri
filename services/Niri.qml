@@ -7,7 +7,6 @@ Singleton {
     id: root
     property var workspaces: []
     property var windows: []
-    property var outputs: []
     property string focusedOutput: ""
     property bool connected: false
     property string lastError: ""
@@ -26,6 +25,14 @@ Singleton {
         case "WorkspacesChanged":
             workspaces = data.workspaces || []
             updateFocusedOutput()
+            break
+        case "WorkspaceUrgencyChanged":
+            workspaces = workspaces.map(item => item.id === data.id
+                ? Object.assign({}, item, { is_urgent: data.urgent }) : item)
+            break
+        case "WorkspaceActiveWindowChanged":
+            workspaces = workspaces.map(item => item.id === data.workspace_id
+                ? Object.assign({}, item, { active_window_id: data.active_window_id }) : item)
             break
         case "WorkspaceActivated": {
             const activated = workspaces.find(item => item.id === data.id)
@@ -49,6 +56,12 @@ Singleton {
             const index = next.findIndex(item => item.id === data.window.id)
             if (index < 0) next.push(data.window)
             else next[index] = data.window
+            if (data.window.is_focused) {
+                for (let i = 0; i < next.length; ++i) {
+                    if (next[i].id !== data.window.id && next[i].is_focused)
+                        next[i] = Object.assign({}, next[i], { is_focused: false })
+                }
+            }
             windows = next
             break
         }
@@ -56,13 +69,20 @@ Singleton {
             windows = windows.filter(item => item.id !== data.id)
             break
         case "WindowFocusChanged":
-            windows = windows.map(item => Object.assign({}, item, { is_focused: item.id === data.id }))
+            windows = windows.map(item => Object.assign({}, item, {
+                is_focused: data.id !== null && item.id === data.id
+            }))
             break
-        case "OutputsChanged":
-            outputs = data.outputs || []
+        case "WindowUrgencyChanged":
+            windows = windows.map(item => item.id === data.id
+                ? Object.assign({}, item, { is_urgent: data.urgent }) : item)
+            break
+        case "WindowFocusTimestampChanged":
+            windows = windows.map(item => item.id === data.id
+                ? Object.assign({}, item, { focus_timestamp: data.focus_timestamp }) : item)
             break
         case "ConfigLoaded":
-            lastError = ""
+            lastError = data.failed ? "Niri failed to load its configuration" : ""
             break
         }
     }
